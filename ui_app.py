@@ -170,26 +170,36 @@ if "snapshots" in st.session_state:
     st.divider()
     st.subheader("🔄 逐步演示")
 
-    # 步骤控制按钮
+    # --- 核心修复：初始化滑动条的专属状态变量 ---
+    if "step_slider" not in st.session_state:
+        st.session_state["step_slider"] = 0
+    # 防止求解新题时，旧的步数超出新题的最大步数
+    if st.session_state["step_slider"] >= total_steps:
+        st.session_state["step_slider"] = 0
+
+    # 步骤控制按钮 (直接修改 step_slider 的值)
     col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
     with col1:
         if st.button("⏮ 第一步"):
-            st.session_state["current_step"] = 0
+            st.session_state["step_slider"] = 0
     with col2:
         if st.button("◀ 上一步"):
-            st.session_state["current_step"] = max(0, st.session_state["current_step"] - 1)
+            st.session_state["step_slider"] = max(0, st.session_state["step_slider"] - 1)
     with col3:
         if st.button("下一步 ▶"):
-            st.session_state["current_step"] = min(total_steps - 1, st.session_state["current_step"] + 1)
+            st.session_state["step_slider"] = min(total_steps - 1, st.session_state["step_slider"] + 1)
     with col4:
         if st.button("最后一步 ⏭"):
-            st.session_state["current_step"] = total_steps - 1
+            st.session_state["step_slider"] = total_steps - 1
 
+    # 滑动条 (自动与 session_state["step_slider"] 绑定)
     step = st.slider(
-        "当前步骤", 0, total_steps - 1,
-        st.session_state["current_step"], key="step_slider",
+        "当前步骤", 
+        min_value=0, 
+        max_value=total_steps - 1,
+        key="step_slider"  # 关键点：不再单独传 value 参数，直接绑定 key
     )
-    st.session_state["current_step"] = step
+    
     snap = snapshots[step]
 
     # 阶段 + 状态指示
@@ -202,7 +212,7 @@ if "snapshots" in st.session_state:
     }
     phase_str = phase_map.get(snap.phase, "")
     status_str = status_map.get(snap.status, "")
-    st.info(f"**步骤 {step}/{total_steps - 1}** — {phase_str}{status_str}")
+    st.info(f"**步骤 {step}/{max(0, total_steps - 1)}** — {phase_str}{status_str}")
 
     # 教学说明
     st.markdown("### 📖 说明")
@@ -261,3 +271,4 @@ if "snapshots" in st.session_state:
             st.markdown(f"---\n#### {phase_tag}步骤 {i}")
             st.markdown(s.explanation)
             st.markdown(snapshot_to_latex_table(s, highlight=False))
+
