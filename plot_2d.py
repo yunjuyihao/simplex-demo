@@ -112,7 +112,15 @@ def plot_feasible_region(A, b, constraint_types, snapshots, var_names, is_min):
         xaxis_title=x_label,
         yaxis_title=y_label,
         template="plotly_white",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        # 将 xanchor 改为 right，x 改为 0.99，并加上背景色防遮挡
+        legend=dict(
+            yanchor="top", y=0.99, 
+            xanchor="right", x=0.99,
+            bgcolor="rgba(255, 255, 255, 0.8)",
+            bordercolor="rgba(0, 0, 0, 0.2)",
+            borderwidth=1
+        )
     )
+
     
     return fig
