@@ -33,14 +33,39 @@ def _frac(v) -> Fraction:
 
 
 def _frac_str(f: Fraction) -> str:
+    """内部文字格式化，现在也支持大M解析了"""
     if f is None:
         return "-"
     f = _frac(f)
+    
+    # 【修复】为文字说明也增加大M识别雷达
+    if abs(f) > 1000:
+        coeff = f / BIG_M
+        coeff = Fraction(coeff).limit_denominator(1000)
+        remainder = f - coeff * BIG_M
+        remainder = Fraction(remainder).limit_denominator(1000)
+        
+        parts = []
+        if coeff != 0:
+            if coeff == 1:
+                parts.append("M")
+            elif coeff == -1:
+                parts.append("-M")
+            else:
+                parts.append(f"{_frac_str_simple(coeff)}M")
+        if remainder != 0:
+            sign = "+" if remainder > 0 else ""
+            parts.append(f"{sign}{_frac_str_simple(remainder)}")
+        return "".join(parts) if parts else "0"
+        
+    return _frac_str_simple(f)
+
+def _frac_str_simple(f: Fraction) -> str:
+    """基础的分数转 LaTeX 字符串"""
     if f.denominator == 1:
         return str(f.numerator)
     sign = "-" if f < 0 else ""
     return f"{sign}\\dfrac{{{abs(f.numerator)}}}{{{f.denominator}}}"
-
 
 # ============================================================
 #  核心单纯形迭代器（不做标准化，只做纯迭代）
