@@ -9,7 +9,7 @@ def frac_display(f: Fraction, use_latex: bool = True) -> str:
         return "—"
     f = Fraction(f).limit_denominator(10**8)
 
-    if abs(f) >= BIG_M // 2:
+    if abs(f) >= 1000:
         coeff = f / BIG_M
         coeff = Fraction(coeff).limit_denominator(1000)
         remainder = f - coeff * BIG_M
