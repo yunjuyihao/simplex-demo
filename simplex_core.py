@@ -109,11 +109,12 @@ class _SimplexIterator:
 
     # ---------- 入基 ----------
     def _find_entering(self) -> int:
+        """国内教材：选检验数最小的负值（σ_j < 0 才入基）"""
         obj_row = self.tableau[-1]
         n = len(obj_row) - 1
         best_col, best_val = -1, Fraction(0)
         for j in range(n):
-            if obj_row[j] > best_val:
+            if obj_row[j] < best_val:  # 改为 < 0
                 best_val = obj_row[j]
                 best_col = j
         return best_col
@@ -161,8 +162,6 @@ class _SimplexIterator:
             m = len(self.tableau) - 1
 
             if entering == -1:
-                # 最优
-                # 检查人工变量
                 has_art = False
                 for i in range(m):
                     if self.basis[i] in self.artificial_indices and self.tableau[i][-1] > 0:
@@ -170,7 +169,7 @@ class _SimplexIterator:
                         break
                 if has_art:
                     self._snap(
-                        "❌ 所有检验数 $\\leq 0$，但基中仍有值 $> 0$ 的人工变量，"
+                        "❌ 所有检验数 $\\geq 0$，但基中仍有值 $> 0$ 的人工变量，"
                         "原问题**无可行解**。",
                         status="infeasible"
                     )
@@ -182,26 +181,24 @@ class _SimplexIterator:
                     )
                 return self.snapshots
 
-            # 出基
             leaving, theta = self._find_leaving(entering)
             if leaving == -1:
                 self._snap(
                     f"选入基变量 ${self.var_names[entering]}$"
-                    f"（检验数 $= {_frac_str(self.tableau[-1][entering])}$），"
+                    f"（检验数 $\\sigma = {_frac_str(self.tableau[-1][entering])}$），"
                     f"但该列所有系数 $\\leq 0$，**问题无界**！",
                     status="unbounded",
                     pivot_col=entering,
                 )
                 return self.snapshots
 
-            # 生成说明
             explanation = self._iter_explanation(entering, leaving, theta)
             self._snap(explanation, pivot_col=entering, pivot_row=leaving, theta=theta)
-
             self._pivot(leaving, entering)
 
         self._snap("⚠️ 达到最大迭代次数。", status="infeasible")
         return self.snapshots
+
 
     # ---------- 说明文本 ----------
     def _iter_explanation(self, entering, leaving, theta):
@@ -231,8 +228,8 @@ class _SimplexIterator:
 
         return (
             f"**{phase_prefix}第 {len(self.snapshots)} 次迭代**\n\n"
-            f"1️⃣ **入基变量**：检验数最大正值 "
-            f"${_frac_str(obj_row[entering])}$ → ${entering_name}$ 入基\n\n"
+            f"1️⃣ **入基变量**：检验数最小负值 "
+            f"$\\sigma = {_frac_str(obj_row[entering])}$ → ${entering_name}$ 入基\n\n"
             f"2️⃣ **最小比值法**：{'；'.join(theta_parts)}\n\n"
             f"最小 $\\theta = {_frac_str(theta[leaving])}$ "
             f"→ ${leaving_name}$ 出基\n\n"
@@ -245,9 +242,9 @@ class _SimplexIterator:
             phase_prefix = "【第一阶段】"
         elif self.phase == 2:
             phase_prefix = "【第二阶段】"
-        obj_val = self.tableau[-1][-1]
+        obj_val = self.tableau[-1][-1]  # 现在直接就是 z 值
         return (
-            f"✅ {phase_prefix}所有检验数 $\\leq 0$，达到**最优解**！\n\n"
+            f"✅ {phase_prefix}所有检验数 $\\geq 0$，达到**最优解**！\n\n"
             f"目标行右端值 = ${_frac_str(obj_val)}$"
         )
 
@@ -407,9 +404,7 @@ class SimplexSolver:
         m = len(tableau)
         n = total_vars
 
-        # 构造目标行
         if art_indices:
-            # 大 M 法：人工变量目标系数 = -M（max 化问题）
             if self.is_min:
                 c_max = [-_frac(v) for v in self.c]
             else:
@@ -420,9 +415,15 @@ class SimplexSolver:
         else:
             obj_row = list(c_orig_ext)
 
+        # 【核心修改】整行取负，使得检验数 = -(c_j - z_j) 变为 (c_j - z_j)
+        # 国内教材：σ_j = c_j - z_j，σ_j < 0 则入基
+        # 所以我们存 -c_j（取负），这样初始检验数就是 -c_j
+        # 经过消去后就得到 z_j - c_j，也就是 -σ_j... 
+        # 不对，更直接的做法：直接把目标行符号全部取反
+        obj_row = [-v for v in obj_row]
+        
         tableau.append(obj_row)
 
-        # 消去基变量在目标行中的系数
         for i in range(m):
             bv = basis[i]
             if tableau[m][bv] != 0:
@@ -430,18 +431,15 @@ class SimplexSolver:
                 for k in range(n + 1):
                     tableau[m][k] -= factor * tableau[i][k]
 
-        # 迭代
         solver = _SimplexIterator(
             tableau, basis, var_names,
             obj_name="z", phase=0,
             artificial_indices=art_indices
         )
         snapshots = solver.run("📋 【大M法】初始单纯形表构造完成。")
-
-        # 提取最终解
         self._append_final_solution(snapshots, var_names)
-
         return snapshots
+
 
     # ================== 两阶段法 ==================
     def _solve_two_phase(self, var_names, tableau, basis, art_indices, c_orig_ext, total_vars):
@@ -453,7 +451,7 @@ class SimplexSolver:
         # 目标行：人工变量系数 = -1，其余 = 0（max 化形式：max -w）
         phase1_obj = [Fraction(0)] * n + [Fraction(0)]
         for ai in art_indices:
-            phase1_obj[ai] = Fraction(-1)
+            phase1_obj[ai] = Fraction(1)  # 改为 +1
 
         phase1_tableau = [row[:] for row in tableau]
         phase1_tableau.append(phase1_obj)
@@ -550,7 +548,7 @@ class SimplexSolver:
             phase2_tableau.append(row)
 
         # 第二阶段目标行
-        phase2_obj = [c_orig_ext[j] for j in keep_cols] + [Fraction(0)]
+        phase2_obj = [-c_orig_ext[j] for j in keep_cols] + [Fraction(0)]
         phase2_tableau.append(phase2_obj)
 
         # 消去基变量在新目标行中的系数
@@ -594,19 +592,21 @@ class SimplexSolver:
             name = var_names[bv]
             sol[name] = tab[i][-1]
 
-        # 只展示原始变量
         orig_parts = []
         for name in self.var_names[:self.num_orig]:
             val = sol.get(name, Fraction(0))
             orig_parts.append(f"${name} = {_frac_str(val)}$")
 
-        # 提取最终解（右下角）
+        # 【修改】现在右下角直接就是 z 值
+        # 对于 max 问题：直接读取
+        # 对于 min 问题：我们是把 min 转成 max(-z) 再取反的
+        #   取反后存的是 -(-c) = c，经过迭代后右下角是 -z_min
+        #   所以 min 问题要再取反
         raw_val = tab[-1][-1]
-        
-        # 核心修正：
-        # 对于 max 问题，右下角存的是 -z，所以真正的 z* 是 -raw_val
-        # 对于 min 问题，我们把它转成了 max(-z)，右下角存的也是 -(-z)，所以真正的 z* 就是 raw_val
-        final_z = raw_val if self.is_min else -raw_val
+        if self.is_min:
+            final_z = -raw_val
+        else:
+            final_z = raw_val
 
         last.explanation += (
             f"\n\n---\n\n"
@@ -614,3 +614,4 @@ class SimplexSolver:
             f"最优解：{'，'.join(orig_parts)}\n\n"
             f"最优值：$z^* = {_frac_str(final_z)}$"
         )
+
