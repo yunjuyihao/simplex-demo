@@ -300,31 +300,29 @@ class _Standardizer:
         # 额外列模板
         extra = [[Fraction(0)] * 0 for _ in range(m)]  # 先空着
 
-        slack_id = surplus_id = art_id = 0
-
-        col_types = []  # 'slack', 'surplus', 'artificial'
+        # 【修改】取消分别编号，统一使用 next_var_idx 往后排
+        next_var_idx = self.num_orig + 1
 
         for i, ct in enumerate(self.types):
             if ct == '<=':
-                slack_id += 1
-                var_names.append(f"s_{slack_id}")
-                col_types.append('slack')
+                var_names.append(f"x_{next_var_idx}")
+                next_var_idx += 1
                 for j in range(m):
                     extra[j].append(Fraction(1) if j == i else Fraction(0))
                 basis[i] = col_offset
                 col_offset += 1
 
             elif ct == '>=':
-                surplus_id += 1
-                var_names.append(f"e_{surplus_id}")
-                col_types.append('surplus')
+                # 添加剩余变量
+                var_names.append(f"x_{next_var_idx}")
+                next_var_idx += 1
                 for j in range(m):
                     extra[j].append(Fraction(-1) if j == i else Fraction(0))
                 col_offset += 1
 
-                art_id += 1
-                var_names.append(f"a_{art_id}")
-                col_types.append('artificial')
+                # 添加人工变量
+                var_names.append(f"x_{next_var_idx}")
+                next_var_idx += 1
                 for j in range(m):
                     extra[j].append(Fraction(1) if j == i else Fraction(0))
                 artificial_indices.append(col_offset)
@@ -332,9 +330,9 @@ class _Standardizer:
                 col_offset += 1
 
             elif ct == '=':
-                art_id += 1
-                var_names.append(f"a_{art_id}")
-                col_types.append('artificial')
+                # 添加人工变量
+                var_names.append(f"x_{next_var_idx}")
+                next_var_idx += 1
                 for j in range(m):
                     extra[j].append(Fraction(1) if j == i else Fraction(0))
                 artificial_indices.append(col_offset)
@@ -359,6 +357,7 @@ class _Standardizer:
         c_orig_extended = list(c_max) + [Fraction(0)] * (total_vars - self.num_orig) + [Fraction(0)]
 
         return var_names, tableau, basis, artificial_indices, c_orig_extended, total_vars
+
 
 
 # ============================================================
