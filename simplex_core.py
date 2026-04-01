@@ -600,13 +600,18 @@ class SimplexSolver:
             val = sol.get(name, Fraction(0))
             orig_parts.append(f"${name} = {_frac_str(val)}$")
 
-        obj_val = tab[-1][-1]
-        if self.is_min:
-            obj_val = -obj_val
+        # 提取最终解（右下角）
+        raw_val = tab[-1][-1]
+        
+        # 核心修正：
+        # 对于 max 问题，右下角存的是 -z，所以真正的 z* 是 -raw_val
+        # 对于 min 问题，我们把它转成了 max(-z)，右下角存的也是 -(-z)，所以真正的 z* 就是 raw_val
+        final_z = raw_val if self.is_min else -raw_val
 
         last.explanation += (
             f"\n\n---\n\n"
             f"🎯 **最终结果**\n\n"
             f"最优解：{'，'.join(orig_parts)}\n\n"
-            f"最优值：$z^* = {_frac_str(obj_val)}$"
+            f"最优值：$z^* = {_frac_str(final_z)}$"
         )
+
