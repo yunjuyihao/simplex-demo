@@ -109,14 +109,16 @@ class _SimplexIterator:
 
     # ---------- 入基 ----------
     def _find_entering(self) -> int:
+        """返回检验数最小（负值最小）列下标，全 >= 0 则返回 -1"""
         obj_row = self.tableau[-1]
         n = len(obj_row) - 1
         best_col, best_val = -1, Fraction(0)
         for j in range(n):
-            if obj_row[j] > best_val:
+            if obj_row[j] < best_val:  # 【改动】原本是 >，现在改成 <
                 best_val = obj_row[j]
                 best_col = j
         return best_col
+
 
     # ---------- 出基 ----------
     def _find_leaving(self, col: int):
